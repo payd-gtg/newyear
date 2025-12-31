@@ -1,14 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
 <meta charset="UTF-8">
-<title>From Payd</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEW YEAR GES</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <style>
 html,body{
   margin:0;
   overflow:hidden;
   background:#000;
+  touch-action:none;
 }
 canvas{display:block}
 </style>
@@ -24,234 +25,236 @@ const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 /* ================= SCENE ================= */
 const scene = new THREE.Scene();
-
 const camera = new THREE.PerspectiveCamera(
-  60,
-  innerWidth / innerHeight,
+  55,
+  innerWidth/innerHeight,
   0.1,
   1000
 );
-camera.position.z = isMobile ? 40 : 32;
+camera.position.z = isMobile ? 42 : 32;
 
-const renderer = new THREE.WebGLRenderer({ antialias:true });
+const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(innerWidth, innerHeight);
-renderer.setPixelRatio(devicePixelRatio);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.setClearColor(0x000000);
 document.body.appendChild(renderer.domElement);
 
-/* ================= 360 CAMERA CONTROL ================= */
-let dragging = false;
-let lastX = 0;
-let lastY = 0;
-let targetRotX = 0;
-let targetRotY = 0;
+/* ================= TOUCH CONTROL (FIX ANDROID) ================= */
+let isDrag=false;
+let lastX=0,lastY=0;
+let targetRX=0,targetRY=0;
+let currentRX=0,currentRY=0;
 
-addEventListener("pointerdown", e=>{
-  dragging = true;
-  lastX = e.clientX;
-  lastY = e.clientY;
-});
+let startDist=0;
+let startZoom=camera.position.z;
 
-addEventListener("pointerup", ()=> dragging = false);
-addEventListener("pointerleave", ()=> dragging = false);
-
-addEventListener("pointermove", e=>{
-  if(!dragging) return;
-  const dx = e.clientX - lastX;
-  const dy = e.clientY - lastY;
-
-  targetRotY += dx * 0.003;
-  targetRotX += dy * 0.002;
-  targetRotX = Math.max(-1.2, Math.min(1.2, targetRotX));
-
-  lastX = e.clientX;
-  lastY = e.clientY;
-});
-
-/* ================= PARTICLES ================= */
-const COUNT = isMobile ? 4200 : 9000;
-const geo = new THREE.BufferGeometry();
-const pos = new Float32Array(COUNT * 3);
-
-for(let i=0;i<pos.length;i++){
-  pos[i] = (Math.random() - 0.5) * 80;
+function distance(t1,t2){
+  const dx=t1.clientX-t2.clientX;
+  const dy=t1.clientY-t2.clientY;
+  return Math.sqrt(dx*dx+dy*dy);
 }
 
-geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+addEventListener("touchstart",e=>{
+  if(e.touches.length===1){
+    isDrag=true;
+    lastX=e.touches[0].clientX;
+    lastY=e.touches[0].clientY;
+  }
+  if(e.touches.length===2){
+    startDist=distance(e.touches[0],e.touches[1]);
+    startZoom=camera.position.z;
+  }
+},{passive:false});
 
-const mat = new THREE.PointsMaterial({
-  color: 0xffb6c1,
-  size: isMobile ? 0.18 : 0.22,
-  transparent: true,
-  blending: THREE.AdditiveBlending
+addEventListener("touchmove",e=>{
+  e.preventDefault();
+
+  if(e.touches.length===1 && isDrag){
+    const dx=e.touches[0].clientX-lastX;
+    const dy=e.touches[0].clientY-lastY;
+    targetRY+=dx*0.0025;
+    targetRX+=dy*0.002;
+    targetRX=Math.max(-1.1,Math.min(1.1,targetRX));
+    lastX=e.touches[0].clientX;
+    lastY=e.touches[0].clientY;
+  }
+
+  if(e.touches.length===2){
+    const d=distance(e.touches[0],e.touches[1]);
+    camera.position.z=startZoom-(d-startDist)*0.05;
+    camera.position.z=Math.max(22,Math.min(60,camera.position.z));
+  }
+},{passive:false});
+
+addEventListener("touchend",()=>isDrag=false);
+
+/* ================= PARTICLES ================= */
+const COUNT=isMobile?5000:9000;
+const geo=new THREE.BufferGeometry();
+const pos=new Float32Array(COUNT*3);
+
+for(let i=0;i<COUNT*3;i++){
+  pos[i]=(Math.random()-0.5)*90;
+}
+geo.setAttribute("position",new THREE.BufferAttribute(pos,3));
+
+const mat=new THREE.PointsMaterial({
+  color:0xffb6c1,
+  size:isMobile?0.22:0.26,
+  transparent:true,
+  blending:THREE.AdditiveBlending
 });
+scene.add(new THREE.Points(geo,mat));
 
-scene.add(new THREE.Points(geo, mat));
-
-/* ================= TEXT TO PARTICLES ================= */
+/* ================= TEXT TO PARTICLES (BIG & CLEAR) ================= */
 function textToPoints(text){
-  const c = document.createElement("canvas");
-  c.width = innerWidth * 1.6;
-  c.height = innerHeight * 0.6;
-  const ctx = c.getContext("2d");
+  const c=document.createElement("canvas");
+  c.width=isMobile?1400:2000;
+  c.height=isMobile?700:900;
+  const ctx=c.getContext("2d");
 
-  const fontSize = isMobile ? c.width * 0.22 : c.width * 0.14;
-  ctx.font = `bold ${fontSize}px Arial`;
-  ctx.fillStyle = "#fff";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(text, c.width/2, c.height/2);
+  ctx.clearRect(0,0,c.width,c.height);
+  ctx.fillStyle="#fff";
+  ctx.textAlign="center";
+  ctx.textBaseline="middle";
 
-  const data = ctx.getImageData(0,0,c.width,c.height).data;
-  const points = [];
-  const scale = isMobile ? 9 : 16;
+  const fontSize=isMobile?320:260;
+  ctx.font=`900 ${fontSize}px Arial Black`;
+  ctx.fillText(text,c.width/2,c.height/2);
+
+  const data=ctx.getImageData(0,0,c.width,c.height).data;
+  const pts=[];
+  const scale=isMobile?10:14;
 
   for(let y=0;y<c.height;y+=6){
     for(let x=0;x<c.width;x+=6){
-      if(data[(y*c.width + x) * 4] > 200){
-        points.push({
-          x:(x - c.width/2) / scale,
-          y:(c.height/2 - y) / scale,
-          z:isMobile ? 6 : (Math.random() - 0.5) * 2
+      if(data[(y*c.width+x)*4]>200){
+        pts.push({
+          x:(x-c.width/2)/scale,
+          y:(c.height/2-y)/scale,
+          z:0
         });
       }
     }
   }
-  return points;
+  return pts;
 }
 
 /* ================= MORPH ================= */
 function morph(text){
-  const t = textToPoints(text);
-  const p = geo.attributes.position.array;
-
-  if(isMobile) camera.position.z = 30;
+  const t=textToPoints(text);
+  const p=geo.attributes.position.array;
 
   for(let i=0;i<COUNT;i++){
-    const g = t[i % t.length];
+    const g=t[i%t.length];
     gsap.to(p,{
-      [i*3]: g.x,
-      [i*3+1]: g.y,
-      [i*3+2]: g.z,
-      duration: 2,
-      ease: "power4.inOut",
-      onUpdate: ()=> geo.attributes.position.needsUpdate = true
+      [i*3]:g.x,
+      [i*3+1]:g.y,
+      [i*3+2]:g.z,
+      duration:2,
+      ease:"power4.inOut",
+      onUpdate:()=>geo.attributes.position.needsUpdate=true
     });
   }
 }
 
 /* ================= EXPLODE ================= */
 function explode(){
-  const p = geo.attributes.position.array;
+  const p=geo.attributes.position.array;
   for(let i=0;i<COUNT;i++){
     gsap.to(p,{
-      [i*3]: p[i*3] + (Math.random()-0.5)*40,
-      [i*3+1]: p[i*3+1] + (Math.random()-0.5)*40,
-      [i*3+2]: p[i*3+2] + (Math.random()-0.5)*40,
-      duration: 1,
-      onUpdate: ()=> geo.attributes.position.needsUpdate = true
+      [i*3]:p[i*3]+(Math.random()-0.5)*50,
+      [i*3+1]:p[i*3+1]+(Math.random()-0.5)*50,
+      [i*3+2]:p[i*3+2]+(Math.random()-0.5)*50,
+      duration:1.1,
+      onUpdate:()=>geo.attributes.position.needsUpdate=true
     });
   }
 }
 
 /* ================= FIREWORK ================= */
-let allowFireworks = true;
-const fireworks = [];
-
+const fireworks=[];
 function launchFirework(){
-  if(!allowFireworks) return;
+  const n=isMobile?140:220;
+  const g=new THREE.BufferGeometry();
+  const p=new Float32Array(n*3);
+  const v=new Float32Array(n*3);
 
-  const count = isMobile ? 160 : 260;
-  const g = new THREE.BufferGeometry();
-  const p = new Float32Array(count * 3);
-  const v = new Float32Array(count * 3);
-
-  for(let i=0;i<count;i++){
-    const a = Math.random() * Math.PI * 2;
-    const s = Math.random() * 1.5;
-    v[i*3]   = Math.cos(a) * s;
-    v[i*3+1] = Math.sin(a) * s;
-    v[i*3+2] = (Math.random() - 0.5) * s;
+  for(let i=0;i<n;i++){
+    const a=Math.random()*Math.PI*2;
+    const s=Math.random()*1.8;
+    v[i*3]=Math.cos(a)*s;
+    v[i*3+1]=Math.sin(a)*s;
+    v[i*3+2]=(Math.random()-0.5)*s;
   }
 
-  g.setAttribute("position", new THREE.BufferAttribute(p,3));
-  g.setAttribute("velocity", new THREE.BufferAttribute(v,3));
+  g.setAttribute("position",new THREE.BufferAttribute(p,3));
+  g.setAttribute("velocity",new THREE.BufferAttribute(v,3));
 
-  const m = new THREE.PointsMaterial({
-    color: new THREE.Color().setHSL(Math.random(),1,0.7),
-    size: 0.28,
-    transparent: true,
-    blending: THREE.AdditiveBlending
+  const m=new THREE.PointsMaterial({
+    color:new THREE.Color().setHSL(Math.random(),1,0.65),
+    size:0.32,
+    transparent:true,
+    blending:THREE.AdditiveBlending
   });
 
-  const f = new THREE.Points(g,m);
-  f.position.set((Math.random()-0.5)*18,(Math.random()*8)+4,0);
-  f.userData.t = 0;
+  const f=new THREE.Points(g,m);
+  f.position.set((Math.random()-0.5)*18,(Math.random()*10)+6,0);
+  f.userData.t=0;
   scene.add(f);
   fireworks.push(f);
 }
 
 function updateFireworks(){
-  for(let i=fireworks.length-1;i>=0;i--){
-    const f = fireworks[i];
-    const p = f.geometry.attributes.position.array;
-    const v = f.geometry.attributes.velocity.array;
-    f.userData.t += 0.03;
-
+  fireworks.forEach((f,i)=>{
+    const p=f.geometry.attributes.position.array;
+    const v=f.geometry.attributes.velocity.array;
+    f.userData.t+=0.03;
     for(let j=0;j<p.length/3;j++){
-      p[j*3]   += v[j*3];
-      p[j*3+1] += v[j*3+1] - f.userData.t * 0.04;
-      p[j*3+2] += v[j*3+2];
+      p[j*3]+=v[j*3];
+      p[j*3+1]+=v[j*3+1]-f.userData.t*0.04;
+      p[j*3+2]+=v[j*3+2];
     }
-
-    f.geometry.attributes.position.needsUpdate = true;
-
-    if(f.userData.t > 2){
+    f.geometry.attributes.position.needsUpdate=true;
+    if(f.userData.t>2){
       scene.remove(f);
       fireworks.splice(i,1);
     }
-  }
+  });
 }
 
 /* ================= TIMELINE ================= */
 setTimeout(()=>morph("1"),1000);
-setTimeout(explode,3500);
-setTimeout(()=>morph("2"),4200);
-setTimeout(explode,6500);
-setTimeout(()=>morph("3"),7200);
-setTimeout(explode,9500);
+setTimeout(explode,3000);
+setTimeout(()=>morph("2"),3800);
+setTimeout(explode,6000);
+setTimeout(()=>morph("3"),6800);
+setTimeout(explode,9000);
+setTimeout(()=>morph("NEW YEAR GES"),10000);
 
-setTimeout(()=>{
-  allowFireworks = false;
-  morph("New Year <3");
-},10200);
-
-setTimeout(()=> allowFireworks = true, 15000);
+setInterval(launchFirework,isMobile?2400:1600);
 
 /* ================= LOOP ================= */
 function animate(){
   requestAnimationFrame(animate);
 
-  // auto 360 rotate
-  targetRotY += 0.0008;
+  currentRX+=(targetRX-currentRX)*0.08;
+  currentRY+=(targetRY-currentRY)*0.08;
 
-  camera.rotation.y += (targetRotY - camera.rotation.y) * 0.05;
-  camera.rotation.x += (targetRotX - camera.rotation.x) * 0.05;
+  scene.rotation.x=currentRX;
+  scene.rotation.y=currentRY;
 
   updateFireworks();
-  renderer.render(scene, camera);
+  renderer.render(scene,camera);
 }
 animate();
 
-setInterval(launchFirework, isMobile ? 2600 : 1800);
-
 /* ================= RESIZE ================= */
 addEventListener("resize",()=>{
-  camera.aspect = innerWidth / innerHeight;
+  camera.aspect=innerWidth/innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
+  renderer.setSize(innerWidth,innerHeight);
 });
 </script>
-
 </body>
 </html>
