@@ -5,7 +5,11 @@
 <title>From Payd</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-html,body{margin:0;overflow:hidden;background:#000}
+html,body{
+  margin:0;
+  overflow:hidden;
+  background:#000;
+}
 canvas{display:block}
 </style>
 </head>
@@ -20,31 +24,71 @@ const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 /* ================= SCENE ================= */
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 1000);
+
+const camera = new THREE.PerspectiveCamera(
+  60,
+  innerWidth / innerHeight,
+  0.1,
+  1000
+);
 camera.position.z = isMobile ? 40 : 32;
 
-const renderer = new THREE.WebGLRenderer({antialias:true});
+const renderer = new THREE.WebGLRenderer({ antialias:true });
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(devicePixelRatio);
 renderer.setClearColor(0x000000);
 document.body.appendChild(renderer.domElement);
 
+/* ================= 360 CAMERA CONTROL ================= */
+let dragging = false;
+let lastX = 0;
+let lastY = 0;
+let targetRotX = 0;
+let targetRotY = 0;
+
+addEventListener("pointerdown", e=>{
+  dragging = true;
+  lastX = e.clientX;
+  lastY = e.clientY;
+});
+
+addEventListener("pointerup", ()=> dragging = false);
+addEventListener("pointerleave", ()=> dragging = false);
+
+addEventListener("pointermove", e=>{
+  if(!dragging) return;
+  const dx = e.clientX - lastX;
+  const dy = e.clientY - lastY;
+
+  targetRotY += dx * 0.003;
+  targetRotX += dy * 0.002;
+  targetRotX = Math.max(-1.2, Math.min(1.2, targetRotX));
+
+  lastX = e.clientX;
+  lastY = e.clientY;
+});
+
 /* ================= PARTICLES ================= */
 const COUNT = isMobile ? 4200 : 9000;
 const geo = new THREE.BufferGeometry();
-const pos = new Float32Array(COUNT*3);
-for(let i=0;i<COUNT*3;i++) pos[i]=(Math.random()-0.5)*80;
-geo.setAttribute("position", new THREE.BufferAttribute(pos,3));
+const pos = new Float32Array(COUNT * 3);
+
+for(let i=0;i<pos.length;i++){
+  pos[i] = (Math.random() - 0.5) * 80;
+}
+
+geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
 
 const mat = new THREE.PointsMaterial({
-  color:0xffb6c1,
-  size:isMobile?0.18:0.22,
-  transparent:true,
-  blending:THREE.AdditiveBlending
+  color: 0xffb6c1,
+  size: isMobile ? 0.18 : 0.22,
+  transparent: true,
+  blending: THREE.AdditiveBlending
 });
-scene.add(new THREE.Points(geo,mat));
 
-/* ================= TEXT TO PARTICLES (FIX ANDROID) ================= */
+scene.add(new THREE.Points(geo, mat));
+
+/* ================= TEXT TO PARTICLES ================= */
 function textToPoints(text){
   const c = document.createElement("canvas");
   c.width = innerWidth * 1.6;
@@ -58,22 +102,22 @@ function textToPoints(text){
   ctx.textBaseline = "middle";
   ctx.fillText(text, c.width/2, c.height/2);
 
-  const d = ctx.getImageData(0,0,c.width,c.height).data;
-  const pts = [];
+  const data = ctx.getImageData(0,0,c.width,c.height).data;
+  const points = [];
   const scale = isMobile ? 9 : 16;
 
   for(let y=0;y<c.height;y+=6){
     for(let x=0;x<c.width;x+=6){
-      if(d[(y*c.width+x)*4]>200){
-        pts.push({
-          x:(x-c.width/2)/scale,
-          y:(c.height/2-y)/scale,
-          z:isMobile?6:(Math.random()-0.5)*2
+      if(data[(y*c.width + x) * 4] > 200){
+        points.push({
+          x:(x - c.width/2) / scale,
+          y:(c.height/2 - y) / scale,
+          z:isMobile ? 6 : (Math.random() - 0.5) * 2
         });
       }
     }
   }
-  return pts;
+  return points;
 }
 
 /* ================= MORPH ================= */
@@ -86,12 +130,12 @@ function morph(text){
   for(let i=0;i<COUNT;i++){
     const g = t[i % t.length];
     gsap.to(p,{
-      [i*3]:g.x,
-      [i*3+1]:g.y,
-      [i*3+2]:g.z,
-      duration:2,
-      ease:"power4.inOut",
-      onUpdate:()=>geo.attributes.position.needsUpdate=true
+      [i*3]: g.x,
+      [i*3+1]: g.y,
+      [i*3+2]: g.z,
+      duration: 2,
+      ease: "power4.inOut",
+      onUpdate: ()=> geo.attributes.position.needsUpdate = true
     });
   }
 }
@@ -101,67 +145,72 @@ function explode(){
   const p = geo.attributes.position.array;
   for(let i=0;i<COUNT;i++){
     gsap.to(p,{
-      [i*3]:p[i*3]+(Math.random()-0.5)*40,
-      [i*3+1]:p[i*3+1]+(Math.random()-0.5)*40,
-      [i*3+2]:p[i*3+2]+(Math.random()-0.5)*40,
-      duration:1,
-      onUpdate:()=>geo.attributes.position.needsUpdate=true
+      [i*3]: p[i*3] + (Math.random()-0.5)*40,
+      [i*3+1]: p[i*3+1] + (Math.random()-0.5)*40,
+      [i*3+2]: p[i*3+2] + (Math.random()-0.5)*40,
+      duration: 1,
+      onUpdate: ()=> geo.attributes.position.needsUpdate = true
     });
   }
 }
 
-/* ================= FIREWORK (CONTROLLED) ================= */
+/* ================= FIREWORK ================= */
 let allowFireworks = true;
-const fireworks=[];
+const fireworks = [];
 
 function launchFirework(){
   if(!allowFireworks) return;
 
   const count = isMobile ? 160 : 260;
   const g = new THREE.BufferGeometry();
-  const p = new Float32Array(count*3);
-  const v = new Float32Array(count*3);
+  const p = new Float32Array(count * 3);
+  const v = new Float32Array(count * 3);
 
   for(let i=0;i<count;i++){
-    const a=Math.random()*Math.PI*2;
-    const s=Math.random()*1.5;
-    v[i*3]=Math.cos(a)*s;
-    v[i*3+1]=Math.sin(a)*s;
-    v[i*3+2]=(Math.random()-0.5)*s;
+    const a = Math.random() * Math.PI * 2;
+    const s = Math.random() * 1.5;
+    v[i*3]   = Math.cos(a) * s;
+    v[i*3+1] = Math.sin(a) * s;
+    v[i*3+2] = (Math.random() - 0.5) * s;
   }
 
   g.setAttribute("position", new THREE.BufferAttribute(p,3));
   g.setAttribute("velocity", new THREE.BufferAttribute(v,3));
 
   const m = new THREE.PointsMaterial({
-    color:new THREE.Color().setHSL(Math.random(),1,0.7),
-    size:0.28,
-    transparent:true,
-    blending:THREE.AdditiveBlending
+    color: new THREE.Color().setHSL(Math.random(),1,0.7),
+    size: 0.28,
+    transparent: true,
+    blending: THREE.AdditiveBlending
   });
 
   const f = new THREE.Points(g,m);
   f.position.set((Math.random()-0.5)*18,(Math.random()*8)+4,0);
-  f.userData.t=0;
+  f.userData.t = 0;
   scene.add(f);
   fireworks.push(f);
 }
 
 function updateFireworks(){
-  fireworks.forEach((f,i)=>{
-    const p=f.geometry.attributes.position.array;
-    const v=f.geometry.attributes.velocity.array;
-    f.userData.t+=0.03;
+  for(let i=fireworks.length-1;i>=0;i--){
+    const f = fireworks[i];
+    const p = f.geometry.attributes.position.array;
+    const v = f.geometry.attributes.velocity.array;
+    f.userData.t += 0.03;
+
     for(let j=0;j<p.length/3;j++){
-      p[j*3]+=v[j*3];
-      p[j*3+1]+=v[j*3+1]-f.userData.t*0.04;
-      p[j*3+2]+=v[j*3+2];
+      p[j*3]   += v[j*3];
+      p[j*3+1] += v[j*3+1] - f.userData.t * 0.04;
+      p[j*3+2] += v[j*3+2];
     }
-    f.geometry.attributes.position.needsUpdate=true;
-    if(f.userData.t>2){
-      scene.remove(f); fireworks.splice(i,1);
+
+    f.geometry.attributes.position.needsUpdate = true;
+
+    if(f.userData.t > 2){
+      scene.remove(f);
+      fireworks.splice(i,1);
     }
-  });
+  }
 }
 
 /* ================= TIMELINE ================= */
@@ -173,28 +222,36 @@ setTimeout(()=>morph("3"),7200);
 setTimeout(explode,9500);
 
 setTimeout(()=>{
-  allowFireworks=false;
-  morph("NEW YEAR GES");
+  allowFireworks = false;
+  morph("New Year <3");
 },10200);
 
-setTimeout(()=>allowFireworks=true,15000);
+setTimeout(()=> allowFireworks = true, 15000);
 
 /* ================= LOOP ================= */
-function animate(t){
+function animate(){
   requestAnimationFrame(animate);
+
+  // auto 360 rotate
+  targetRotY += 0.0008;
+
+  camera.rotation.y += (targetRotY - camera.rotation.y) * 0.05;
+  camera.rotation.x += (targetRotX - camera.rotation.x) * 0.05;
+
   updateFireworks();
-  renderer.render(scene,camera);
+  renderer.render(scene, camera);
 }
 animate();
 
-setInterval(launchFirework, isMobile?2600:1800);
+setInterval(launchFirework, isMobile ? 2600 : 1800);
 
 /* ================= RESIZE ================= */
 addEventListener("resize",()=>{
-  camera.aspect=innerWidth/innerHeight;
+  camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth,innerHeight);
+  renderer.setSize(innerWidth, innerHeight);
 });
 </script>
+
 </body>
 </html>
