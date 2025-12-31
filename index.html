@@ -75,23 +75,32 @@ scene.add(particles);
 
 /* ================= TEXT TO PARTICLES ================= */
 function textToPoints(text){
-  const c=document.createElement("canvas");
-  c.width=1000;c.height=300;
-  const ctx=c.getContext("2d");
-  ctx.fillStyle="black";ctx.fillRect(0,0,c.width,c.height);
-  ctx.font="bold 150px Arial";
-  ctx.fillStyle="white";
-  ctx.textAlign="center";
-  ctx.fillText(text,c.width/2,c.height/1.8);
+  const scale = isMobile ? 0.75 : 1;
 
-  const d=ctx.getImageData(0,0,c.width,c.height).data;
-  const pts=[];
-  for(let y=0;y<c.height;y+=4){
-    for(let x=0;x<c.width;x+=4){
-      if(d[(y*c.width+x)*4]>200){
+  const c = document.createElement("canvas");
+  c.width = innerWidth * 1.4;
+  c.height = innerHeight * 0.5;
+
+  const ctx = c.getContext("2d");
+  ctx.clearRect(0,0,c.width,c.height);
+
+  const fontSize = c.width * 0.12 * scale;
+  ctx.font = `bold ${fontSize}px Arial`;
+  ctx.fillStyle = "white";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  ctx.fillText(text, c.width / 2, c.height / 2);
+
+  const d = ctx.getImageData(0,0,c.width,c.height).data;
+  const pts = [];
+
+  for(let y=0;y<c.height;y+=6){
+    for(let x=0;x<c.width;x+=6){
+      if(d[(y*c.width + x)*4] > 200){
         pts.push({
-          x:(x-c.width/2)/15,
-          y:(c.height/2-y)/15,
+          x:(x - c.width/2) / 18,
+          y:(c.height/2 - y) / 18,
           z:(Math.random()-0.5)*2
         });
       }
@@ -99,6 +108,7 @@ function textToPoints(text){
   }
   return pts;
 }
+
 
 /* ================= MORPH & EXPLODE ================= */
 function explode(){
@@ -134,7 +144,7 @@ const fireworks=[];
 function launchFirework(){
   boom.currentTime=0; boom.play();
 
-  const count=600;
+  const count = isMobile ? 180 : 260;
   const g=new THREE.BufferGeometry();
   const p=new Float32Array(count*3);
   const v=new Float32Array(count*3);
@@ -222,7 +232,8 @@ function animate(t){
   renderer.render(scene,camera);
 }
 animate();
-setInterval(launchFirework,isMobile?1600:900);
+setInterval(launchFirework,isMobile ? 2600 : 1800);
+
 
 /* ================= START AUDIO ================= */
 document.getElementById("auto").onclick=()=>{
@@ -239,5 +250,3 @@ addEventListener("resize",()=>{
 </script>
 </body>
 </html>
-
-
